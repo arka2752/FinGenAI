@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import '../services/ai_transaction_service.dart';
 import 'transaction_screen.dart';
 import 'analytics_screen.dart';
+import 'analytics_screen_v2.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -22,10 +23,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final currentUser = FirebaseAuth.instance.currentUser!;
   bool _isButtonHovered = false;
 
-  // final aiService = AITransactionService(); // AI Service instance
   final AITransactionService _aiService = AITransactionService();
 
-  Map<String, dynamic> _sessionContext = {}; // session context for AI commands
+  Map<String, dynamic> _sessionContext = {};
 
 
   late AnimationController _fadeController;
@@ -103,32 +103,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.height < 700;
+    final isLargeScreen = size.height > 900;
+    
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              const Color(0xFF1a237e),
-              const Color(0xFF3949ab),
-              const Color(0xFF5e35b1),
-              const Color(0xFF8e24aa),
+              colorScheme.primary,
+              colorScheme.primaryContainer,
+              colorScheme.secondary,
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            stops: const [0.0, 0.3, 0.7, 1.0],
+            stops: const [0.0, 0.5, 1.0],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              _buildEnhancedAppBar(),
-              const SizedBox(height: 24),
+              _buildMaterialAppBar(colorScheme, isSmallScreen),
+              SizedBox(height: isSmallScreen ? 16 : 24),
               Expanded(
                 child: StreamBuilder<List<TransactionModel>>(
                   stream: TransactionService().getUserTransactions(currentUser.uid),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return _buildLoadingState();
+                      return _buildMaterialLoadingState(colorScheme);
                     }
 
                     final transactions = snapshot.data ?? [];
@@ -136,116 +141,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                     return RefreshIndicator(
                       onRefresh: () async {
-                        // Trigger rebuild
                         setState(() {});
                       },
-                      color: Colors.white,
-                      backgroundColor: Colors.purple.shade600,
+                      color: colorScheme.primary,
+                      backgroundColor: colorScheme.surface,
                       child: CustomScrollView(
                         slivers: [
                           SliverToBoxAdapter(
                             child: Column(
                               children: [
-                                _buildBalanceCard(balance),
-                                const SizedBox(height: 32),
-                                _buildQuickStats(transactions),
-                                const SizedBox(height: 24),
-                                // Row with Add Transaction button + AI mic
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                                  child: Column(
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(child: _buildInteractiveButton()),
-                                          const SizedBox(width: 16),
-                                          Container(
-                                            decoration: BoxDecoration(
-                                              color: Colors.white.withOpacity(0.15),
-                                              borderRadius: BorderRadius.circular(30),
-                                            ),
-                                            child: IconButton(
-                                              icon: const Icon(Icons.mic, color: Colors.white, size: 32),
-                                              onPressed: () {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (_) => TransactionChatScreen(),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 16),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: ElevatedButton(
-                                          onPressed: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) => AnalyticsScreen(userId: currentUser.uid),
-                                              ),
-                                            );
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.purple.shade600,
-                                            padding: const EdgeInsets.symmetric(vertical: 16),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            "View Analytics",
-                                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                const SizedBox(height: 32),
+                                _buildMaterialBalanceCard(balance, colorScheme, isSmallScreen),
+                                SizedBox(height: isSmallScreen ? 20 : 32),
+                                _buildMaterialQuickStats(transactions, colorScheme, isSmallScreen),
+                                SizedBox(height: isSmallScreen ? 20 : 24),
+                                _buildMaterialActionButtons(colorScheme, isSmallScreen),
+                                SizedBox(height: isSmallScreen ? 20 : 32),
                                 if (transactions.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.history, color: Colors.white70, size: 20),
-                                        const SizedBox(width: 8),
-                                        const Text(
-                                          "Recent Transactions",
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        const Spacer(),
-                                        Text(
-                                          "${transactions.length} items",
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.white60,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                const SizedBox(height: 16),
+                                  _buildMaterialSectionHeader(transactions, colorScheme, isSmallScreen),
+                                SizedBox(height: isSmallScreen ? 12 : 16),
                               ],
                             ),
                           ),
                           if (transactions.isEmpty)
                             SliverFillRemaining(
-                              child: _buildEmptyState(),
+                              child: _buildMaterialEmptyState(colorScheme, isSmallScreen),
                             )
                           else
                             SliverList(
                               delegate: SliverChildBuilderDelegate(
-                                    (context, index) => _buildTransactionCard(transactions[index], index),
+                                    (context, index) => _buildMaterialTransactionCard(
+                                      transactions[index], 
+                                      index, 
+                                      colorScheme, 
+                                      isSmallScreen
+                                    ),
                                 childCount: transactions.length,
                               ),
                             ),
@@ -258,7 +187,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   },
                 ),
               ),
-
             ],
           ),
         ),
@@ -266,9 +194,678 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildMaterialAppBar(ColorScheme colorScheme, bool isSmallScreen) {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Container(
+        padding: EdgeInsets.fromLTRB(
+          isSmallScreen ? 16 : 20, 
+          isSmallScreen ? 16 : 20, 
+          isSmallScreen ? 16 : 20, 
+          isSmallScreen ? 8 : 10
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Material(
+                  elevation: 8,
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+                  color: colorScheme.surface,
+                  child: Container(
+                    padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
+                  decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+                      border: Border.all(
+                        color: colorScheme.outline.withOpacity(0.1),
+                        width: 1,
+                      ),
+                  ),
+                  child: RotationTransition(
+                    turns: _rotationAnimation,
+                      child: Icon(
+                        Icons.account_balance_wallet, 
+                        color: colorScheme.primary, 
+                        size: isSmallScreen ? 24 : 28
+                  ),
+                ),
+                  ),
+                ),
+                SizedBox(width: isSmallScreen ? 12 : 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "FinGenAI",
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      Text(
+                        "Welcome back, ${currentUser.displayName ?? 'User'}!",
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface.withOpacity(0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _buildMaterialIconButton(
+                  colorScheme,
+                  Icons.person_outlined,
+                  () {
+                      Navigator.push(
+                        context,
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) => const DashboardScreen(),
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                            return SlideTransition(
+                              position: animation.drive(
+                                Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
+                                    .chain(CurveTween(curve: Curves.easeInOut)),
+                              ),
+                              child: child,
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  isSmallScreen,
+                ),
+                SizedBox(width: isSmallScreen ? 8 : 12),
+                _buildMaterialIconButton(
+                  colorScheme,
+                  Icons.notifications_outlined,
+                  () {},
+                  isSmallScreen,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMaterialIconButton(ColorScheme colorScheme, IconData icon, VoidCallback onPressed, bool isSmallScreen) {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+      color: colorScheme.surface,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+          border: Border.all(
+            color: colorScheme.outline.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+        child: IconButton(
+          icon: Icon(icon, color: colorScheme.primary, size: isSmallScreen ? 20 : 24),
+          onPressed: onPressed,
+          constraints: BoxConstraints(
+            minWidth: isSmallScreen ? 40 : 48,
+            minHeight: isSmallScreen ? 40 : 48,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMaterialBalanceCard(double balance, ColorScheme colorScheme, bool isSmallScreen) {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: ScaleTransition(
+        scale: _balanceAnimation,
+        child: Container(
+          margin: EdgeInsets.symmetric(horizontal: isSmallScreen ? 16 : 20),
+          child: Material(
+            elevation: 16,
+            borderRadius: BorderRadius.circular(isSmallScreen ? 20 : 24),
+            color: colorScheme.surface,
+            child: Container(
+              padding: EdgeInsets.all(isSmallScreen ? 20 : 24),
+          decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(isSmallScreen ? 20 : 24),
+                border: Border.all(
+                  color: colorScheme.outline.withOpacity(0.1),
+                  width: 1,
+                ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                      Text(
+                    "Total Balance",
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                        padding: EdgeInsets.all(isSmallScreen ? 4 : 6),
+                    decoration: BoxDecoration(
+                          color: (balance >= 0 ? Colors.green : Colors.red).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 6 : 8),
+                    ),
+                    child: Icon(
+                      balance >= 0 ? Icons.trending_up : Icons.trending_down,
+                      color: balance >= 0 ? Colors.green : Colors.red,
+                          size: isSmallScreen ? 14 : 16,
+                    ),
+                  ),
+                ],
+              ),
+                  SizedBox(height: isSmallScreen ? 8 : 12),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 500),
+                child: Text(
+                  "\$${balance.toStringAsFixed(2)}",
+                  key: ValueKey(balance),
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                    shadows: [
+                      Shadow(
+                            color: colorScheme.shadow.withOpacity(0.3),
+                        offset: const Offset(0, 2),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMaterialQuickStats(List<TransactionModel> transactions, ColorScheme colorScheme, bool isSmallScreen) {
+    final income = transactions
+        .where((tx) => tx.type == "income")
+        .fold(0.0, (sum, tx) => sum + tx.amount);
+    final expenses = transactions
+        .where((tx) => tx.type == "expense")
+        .fold(0.0, (sum, tx) => sum + tx.amount);
+
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 16 : 20),
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildMaterialStatCard("Income", income, Icons.arrow_downward, Colors.green, colorScheme, isSmallScreen),
+            ),
+            SizedBox(width: isSmallScreen ? 12 : 16),
+            Expanded(
+              child: _buildMaterialStatCard("Expenses", expenses, Icons.arrow_upward, Colors.red, colorScheme, isSmallScreen),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMaterialStatCard(String title, double amount, IconData icon, Color color, ColorScheme colorScheme, bool isSmallScreen) {
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(isSmallScreen ? 14 : 16),
+      color: colorScheme.surface,
+      child: Container(
+        padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+      decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 14 : 16),
+          border: Border.all(
+            color: colorScheme.outline.withOpacity(0.1),
+            width: 1,
+          ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+                Icon(icon, color: color, size: isSmallScreen ? 18 : 20),
+                SizedBox(width: isSmallScreen ? 6 : 8),
+                Expanded(
+                  child: Text(
+                title,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+            SizedBox(height: isSmallScreen ? 6 : 8),
+          Text(
+            "\$${amount.toStringAsFixed(2)}",
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMaterialActionButtons(ColorScheme colorScheme, bool isSmallScreen) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 16 : 20),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: _buildMaterialInteractiveButton(colorScheme, isSmallScreen)),
+              SizedBox(width: isSmallScreen ? 12 : 16),
+              _buildMaterialMicButton(colorScheme, isSmallScreen),
+            ],
+          ),
+          SizedBox(height: isSmallScreen ? 12 : 16),
+          SizedBox(
+            width: double.infinity,
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+              color: colorScheme.primary,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AnalyticsScreenV2(userId: currentUser.uid),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 14 : 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                  ),
+                ),
+                child: Text(
+                  "View Analytics",
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onPrimary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMaterialInteractiveButton(ColorScheme colorScheme, bool isSmallScreen) {
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isButtonHovered = true),
+        onExit: (_) => setState(() => _isButtonHovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          transform: Matrix4.identity()
+            ..scale(_isButtonHovered ? 1.05 : 1.0)
+            ..rotateZ(_isButtonHovered ? 0.02 : 0.0),
+          child: Material(
+            elevation: _isButtonHovered ? 12 : 8,
+            borderRadius: BorderRadius.circular(isSmallScreen ? 25 : 30),
+            color: colorScheme.primary,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(isSmallScreen ? 25 : 30),
+              onTap: () => showAddTransactionSheet(context),
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 24 : 32, 
+                  vertical: isSmallScreen ? 16 : 20
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(isSmallScreen ? 3 : 4),
+                      decoration: BoxDecoration(
+                        color: colorScheme.onPrimary.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(isSmallScreen ? 6 : 8),
+                      ),
+                      child: Icon(
+                        Icons.add, 
+                        color: colorScheme.onPrimary, 
+                        size: isSmallScreen ? 18 : 20
+                    ),
+                    ),
+                    SizedBox(width: isSmallScreen ? 10 : 12),
+                    Text(
+                      "Add Transaction",
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onPrimary,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMaterialMicButton(ColorScheme colorScheme, bool isSmallScreen) {
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(isSmallScreen ? 25 : 30),
+      color: colorScheme.surface,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 25 : 30),
+          border: Border.all(
+            color: colorScheme.outline.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+        child: IconButton(
+          icon: Icon(
+            Icons.smart_toy, 
+            color: colorScheme.primary, 
+            size: isSmallScreen ? 28 : 32
+          ),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => TransactionChatScreen(),
+              ),
+            );
+          },
+          constraints: BoxConstraints(
+            minWidth: isSmallScreen ? 50 : 60,
+            minHeight: isSmallScreen ? 50 : 60,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMaterialSectionHeader(List<TransactionModel> transactions, ColorScheme colorScheme, bool isSmallScreen) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 16 : 20),
+      child: Row(
+        children: [
+          Icon(
+            Icons.history, 
+            color: colorScheme.onSurface.withOpacity(0.7), 
+            size: isSmallScreen ? 18 : 20
+          ),
+          SizedBox(width: isSmallScreen ? 6 : 8),
+          Text(
+            "Recent Transactions",
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            "${transactions.length} items",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMaterialTransactionCard(TransactionModel transaction, int index, ColorScheme colorScheme, bool isSmallScreen) {
+    return AnimatedBuilder(
+      animation: _cardStaggerAnimation,
+      builder: (context, child) {
+        final delay = index * 0.1;
+        final animationValue = (_cardStaggerAnimation.value - delay).clamp(0.0, 1.0);
+
+        return Transform.translate(
+          offset: Offset(0, 50 * (1 - animationValue)),
+          child: Opacity(
+            opacity: animationValue,
+            child: Container(
+              margin: EdgeInsets.fromLTRB(
+                isSmallScreen ? 16 : 20, 
+                8, 
+                isSmallScreen ? 16 : 20, 
+                8
+              ),
+              child: Material(
+                elevation: 8,
+                borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 20),
+                color: colorScheme.surface,
+              child: Container(
+                decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 20),
+                    border: Border.all(
+                      color: colorScheme.outline.withOpacity(0.1),
+                      width: 1,
+                    ),
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 20),
+                    onTap: () {},
+                    child: Padding(
+                      padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
+                            decoration: BoxDecoration(
+                              color: (transaction.type == "income" ? Colors.green : Colors.red)
+                                  .withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                            ),
+                            child: Icon(
+                              transaction.type == "income" ? Icons.arrow_downward : Icons.arrow_upward,
+                              color: transaction.type == "income" ? Colors.green : Colors.red,
+                              size: isSmallScreen ? 18 : 20,
+                            ),
+                          ),
+                          SizedBox(width: isSmallScreen ? 12 : 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  transaction.title,
+                                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    color: colorScheme.onSurface,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                SizedBox(height: isSmallScreen ? 3 : 4),
+                                Text(
+                                  transaction.date.toLocal().toString().split(' ')[0],
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurface.withOpacity(0.7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                "\$${transaction.amount.toStringAsFixed(2)}",
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: transaction.type == "income" ? Colors.green : Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: isSmallScreen ? 6 : 8),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildMaterialActionIcon(
+                                    colorScheme,
+                                    Icons.edit_outlined,
+                                    () => showEditTransactionSheet(context, transaction),
+                                    isSmallScreen,
+                                  ),
+                                  SizedBox(width: isSmallScreen ? 6 : 8),
+                                  _buildMaterialActionIcon(
+                                    colorScheme,
+                                    Icons.delete_outline,
+                                    () => _showDeleteConfirmation(context, transaction),
+                                    isSmallScreen,
+                                    isDestructive: true,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMaterialActionIcon(ColorScheme colorScheme, IconData icon, VoidCallback onPressed, bool isSmallScreen, {bool isDestructive = false}) {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(isSmallScreen ? 6 : 8),
+      color: isDestructive ? Colors.red.withOpacity(0.1) : colorScheme.surfaceVariant.withOpacity(0.5),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(isSmallScreen ? 6 : 8),
+        onTap: onPressed,
+        child: Container(
+          padding: EdgeInsets.all(isSmallScreen ? 8 : 10),
+          child: Icon(
+            icon, 
+            color: isDestructive ? Colors.red : colorScheme.primary, 
+            size: isSmallScreen ? 16 : 18
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMaterialLoadingState(ColorScheme colorScheme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(16),
+            color: colorScheme.surface,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colorScheme.outline.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
+              child: CircularProgressIndicator(
+                color: colorScheme.primary,
+                strokeWidth: 3,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Loading your transactions...",
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+                          ),
+                        ],
+                      ),
+    );
+  }
+
+  Widget _buildMaterialEmptyState(ColorScheme colorScheme, bool isSmallScreen) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(isSmallScreen ? 18 : 20),
+            color: colorScheme.surface,
+            child: Container(
+              padding: EdgeInsets.all(isSmallScreen ? 20 : 24),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(isSmallScreen ? 18 : 20),
+                border: Border.all(
+                  color: colorScheme.outline.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                Icons.receipt_long_outlined,
+                size: isSmallScreen ? 56 : 64,
+                color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                ),
+              ),
+            ),
+          SizedBox(height: isSmallScreen ? 20 : 24),
+          Text(
+            "No transactions yet",
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          SizedBox(height: isSmallScreen ? 8 : 12),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 32 : 40),
+            child: Text(
+              "Start tracking your finances by adding\nyour first transaction",
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   void showAICommandSheet(BuildContext context, List<TransactionModel> transactions) {
     final commandController = TextEditingController();
+    final colorScheme = Theme.of(context).colorScheme;
+    final isSmallScreen = MediaQuery.of(context).size.height < 700;
 
     showModalBottomSheet(
       context: context,
@@ -277,10 +874,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       builder: (_) => Container(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          padding: EdgeInsets.all(isSmallScreen ? 20 : 24),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(isSmallScreen ? 24 : 28)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -289,61 +886,86 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               Container(
                 width: 40,
                 height: 4,
-                margin: const EdgeInsets.only(bottom: 24),
+                margin: EdgeInsets.only(bottom: isSmallScreen ? 20 : 24),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: colorScheme.outline.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
                 alignment: Alignment.center,
               ),
-              const Text(
+              Text(
                 "AI Command",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: commandController,
-                decoration: InputDecoration(
-                  labelText: "Enter command",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.mic),
+              SizedBox(height: isSmallScreen ? 20 : 24),
+              Material(
+                elevation: 2,
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                child: TextField(
+                  controller: commandController,
+                  decoration: InputDecoration(
+                    labelText: "Enter command",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12)),
+                    prefixIcon: Icon(Icons.mic, color: colorScheme.primary),
+                    filled: true,
+                    fillColor: colorScheme.surface,
+                  ),
                 ),
               ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () async {
-                  final command = commandController.text.trim();
-                  if (command.isEmpty) return;
+              SizedBox(height: isSmallScreen ? 20 : 24),
+              Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                color: colorScheme.primary,
+                child: ElevatedButton(
+              onPressed: () async {
+                    final command = commandController.text.trim();
+                    if (command.isEmpty) return;
 
-                  Navigator.pop(context); // close sheet
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Processing command...")),
-                  );
+                    Navigator.pop(context); // close sheet
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Processing command..."),
+                        backgroundColor: colorScheme.primary,
+                      ),
+                    );
 
-                  final response = await _aiService.handleCommand(
-                    command,
-                    FirebaseAuth.instance.currentUser!.uid,
-                    transactions,
-                    _sessionContext, // added 4th parameter
-                  );
+                    final response = await _aiService.handleCommand(
+                      command,
+                      FirebaseAuth.instance.currentUser!.uid,
+                      transactions,
+                      _sessionContext, // added 4th parameter
+                    );
 
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(response),
+                        backgroundColor: colorScheme.secondary,
+                      ),
+                    );
 
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(response)),
-                  );
-
-                  setState(() {}); // Refresh UI after command
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple.shade600,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    setState(() {}); // Refresh UI after command
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 14 : 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12)),
+                  ),
+                  child: Text(
+                    "Send",
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onPrimary,
+                    ),
+                  ),
                 ),
-                child: const Text("Send", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: isSmallScreen ? 16 : 16),
             ],
           ),
         ),
@@ -428,536 +1050,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return aiMessage; // fallback: just return AI's text
   }
 
-
-  Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const CircularProgressIndicator(
-              color: Colors.white,
-              strokeWidth: 3,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            "Loading your transactions...",
-            style: TextStyle(color: Colors.white70, fontSize: 16),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(
-              Icons.receipt_long_outlined,
-              size: 64,
-              color: Colors.white60,
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            "No transactions yet",
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            "Start tracking your finances by adding\nyour first transaction",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white70,
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEnhancedAppBar() {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.white.withOpacity(0.2), Colors.white.withOpacity(0.1)],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
-                  ),
-                  child: RotationTransition(
-                    turns: _rotationAnimation,
-                    child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 28),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "FinGenAI",
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      Text(
-                        "Welcome back, ${currentUser.displayName ?? 'User'}!",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withOpacity(0.8),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  margin: const EdgeInsets.only(right: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.dashboard_outlined, color: Colors.white, size: 24),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        PageRouteBuilder(
-                          pageBuilder: (context, animation, secondaryAnimation) => const DashboardScreen(),
-                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                            return SlideTransition(
-                              position: animation.drive(
-                                Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
-                                    .chain(CurveTween(curve: Curves.easeInOut)),
-                              ),
-                              child: child,
-                            );
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
-                    onPressed: () {},
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBalanceCard(double balance) {
-    return SlideTransition(
-      position: _slideAnimation,
-      child: ScaleTransition(
-        scale: _balanceAnimation,
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.white.withOpacity(0.25),
-                Colors.white.withOpacity(0.15),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withOpacity(0.2)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Text(
-                    "Total Balance",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: balance >= 0 ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      balance >= 0 ? Icons.trending_up : Icons.trending_down,
-                      color: balance >= 0 ? Colors.green : Colors.red,
-                      size: 16,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 500),
-                child: Text(
-                  "\$${balance.toStringAsFixed(2)}",
-                  key: ValueKey(balance),
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black.withOpacity(0.3),
-                        offset: const Offset(0, 2),
-                        blurRadius: 4,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickStats(List<TransactionModel> transactions) {
-    final income = transactions
-        .where((tx) => tx.type == "income")
-        .fold(0.0, (sum, tx) => sum + tx.amount);
-    final expenses = transactions
-        .where((tx) => tx.type == "expense")
-        .fold(0.0, (sum, tx) => sum + tx.amount);
-
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Row(
-          children: [
-            Expanded(
-              child: _buildStatCard("Income", income, Icons.arrow_downward, Colors.green),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildStatCard("Expenses", expenses, Icons.arrow_upward, Colors.red),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String title, double amount, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "\$${amount.toStringAsFixed(2)}",
-            style: TextStyle(
-              color: color,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInteractiveButton() {
-    return ScaleTransition(
-      scale: _scaleAnimation,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _isButtonHovered = true),
-        onExit: (_) => setState(() => _isButtonHovered = false),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-          transform: Matrix4.identity()
-            ..scale(_isButtonHovered ? 1.05 : 1.0)
-            ..rotateZ(_isButtonHovered ? 0.02 : 0.0),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
-            gradient: LinearGradient(
-              colors: _isButtonHovered
-                  ? [Colors.cyan.shade400, Colors.blue.shade500, Colors.purple.shade600]
-                  : [Colors.blue.shade600, Colors.purple.shade600, Colors.indigo.shade700],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: _isButtonHovered ? Colors.cyan.withOpacity(0.4) : Colors.purple.withOpacity(0.3),
-                blurRadius: _isButtonHovered ? 20 : 10,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(30),
-              onTap: () => showAddTransactionSheet(context),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.add, color: Colors.white, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      "Add Transaction",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTransactionCard(TransactionModel transaction, int index) {
-    return AnimatedBuilder(
-      animation: _cardStaggerAnimation,
-      builder: (context, child) {
-        final delay = index * 0.1;
-        final animationValue = (_cardStaggerAnimation.value - delay).clamp(0.0, 1.0);
-
-        return Transform.translate(
-          offset: Offset(0, 50 * (1 - animationValue)),
-          child: Opacity(
-            opacity: animationValue,
-            child: Container(
-              margin: EdgeInsets.fromLTRB(20, 8, 20, index == 0 ? 8 : 8),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.white.withOpacity(0.15),
-                      Colors.white.withOpacity(0.1),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () {}, // Add tap functionality if needed
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: (transaction.type == "income" ? Colors.green : Colors.red)
-                                  .withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              transaction.type == "income" ? Icons.arrow_downward : Icons.arrow_upward,
-                              color: transaction.type == "income" ? Colors.green : Colors.red,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  transaction.title,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  transaction.date.toLocal().toString().split(' ')[0],
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.7),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                "\$${transaction.amount.toStringAsFixed(2)}",
-                                style: TextStyle(
-                                  color: transaction.type == "income" ? Colors.green : Colors.red,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: IconButton(
-                                      icon: const Icon(Icons.edit_outlined, color: Colors.white, size: 18),
-                                      onPressed: () => showEditTransactionSheet(context, transaction),
-                                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: IconButton(
-                                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
-                                      onPressed: () => _showDeleteConfirmation(context, transaction),
-                                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-  void _showDeleteConfirmation(BuildContext context, TransactionModel transaction) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Colors.grey.shade900,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Delete Transaction', style: TextStyle(color: Colors.white)),
-          content: Text(
-            'Are you sure you want to delete "${transaction.title}"?',
-            style: const TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
-            ),
-            TextButton(
-              onPressed: () async {
-                await TransactionService().deleteTransaction(transaction.id, currentUser.uid);
-                Navigator.pop(context);
-              },
-              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void showAddTransactionSheet(BuildContext context) {
     final titleController = TextEditingController();
     final amountController = TextEditingController();
     String category = "Income";
+    final colorScheme = Theme.of(context).colorScheme;
+    final isSmallScreen = MediaQuery.of(context).size.height < 700;
 
     showModalBottomSheet(
       context: context,
@@ -966,10 +1064,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       builder: (_) => Container(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          padding: EdgeInsets.all(isSmallScreen ? 20 : 24),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(isSmallScreen ? 24 : 28)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -978,44 +1076,64 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               Container(
                 width: 40,
                 height: 4,
-                margin: const EdgeInsets.only(bottom: 24),
+                margin: EdgeInsets.only(bottom: isSmallScreen ? 20 : 24),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: colorScheme.outline.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
                 alignment: Alignment.center,
               ),
-              const Text(
+              Text(
                 "Add Transaction",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 24),
-              TextField(
+              SizedBox(height: isSmallScreen ? 20 : 24),
+              Material(
+                elevation: 2,
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                child: TextField(
                 controller: titleController,
                 decoration: InputDecoration(
                   labelText: "Title",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.title),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12)),
+                    prefixIcon: Icon(Icons.title, color: colorScheme.primary),
+                    filled: true,
+                    fillColor: colorScheme.surface,
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              TextField(
+              SizedBox(height: isSmallScreen ? 16 : 16),
+              Material(
+                elevation: 2,
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                child: TextField(
                 controller: amountController,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: "Amount",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.attach_money),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12)),
+                    prefixIcon: Icon(Icons.attach_money, color: colorScheme.primary),
+                    filled: true,
+                    fillColor: colorScheme.surface,
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
+              SizedBox(height: isSmallScreen ? 16 : 16),
+              Material(
+                elevation: 2,
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                child: DropdownButtonFormField<String>(
                 value: category,
                 decoration: InputDecoration(
                   labelText: "Category",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.category),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12)),
+                    prefixIcon: Icon(Icons.category, color: colorScheme.primary),
+                    filled: true,
+                    fillColor: colorScheme.surface,
                 ),
                 items: ["Income", "Expense"]
                     .map((e) => DropdownMenuItem(value: e, child: Text(e)))
@@ -1024,12 +1142,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   if (value != null) category = value;
                 },
               ),
-              const SizedBox(height: 24),
-              ElevatedButton(
+              ),
+              SizedBox(height: isSmallScreen ? 20 : 24),
+              Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                color: colorScheme.primary,
+                child: ElevatedButton(
                 onPressed: () async {
                   if (titleController.text.isEmpty || amountController.text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Please fill all fields")),
+                        SnackBar(
+                          content: Text("Please fill all fields"),
+                          backgroundColor: colorScheme.error,
+                        ),
                     );
                     return;
                   }
@@ -1047,22 +1173,35 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     await TransactionService().addTransaction(transaction, currentUser.uid);
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Transaction added successfully")),
+                        SnackBar(
+                          content: Text("Transaction added successfully"),
+                          backgroundColor: colorScheme.primary,
+                        ),
                     );
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Failed to add transaction: $e")));
+                          SnackBar(
+                            content: Text("Failed to add transaction: $e"),
+                            backgroundColor: colorScheme.error,
+                          ));
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple.shade600,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 14 : 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12)),
+                  ),
+                  child: Text(
+                    "Add Transaction", 
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onPrimary,
+                    ),
+                  ),
                 ),
-                child: const Text("Add Transaction", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: isSmallScreen ? 16 : 16),
             ],
           ),
         ),
@@ -1074,6 +1213,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final titleController = TextEditingController(text: transaction.title);
     final amountController = TextEditingController(text: transaction.amount.toString());
     String category = transaction.type == "income" ? "Income" : "Expense";
+    final colorScheme = Theme.of(context).colorScheme;
+    final isSmallScreen = MediaQuery.of(context).size.height < 700;
 
     showModalBottomSheet(
       context: context,
@@ -1082,10 +1223,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       builder: (_) => Container(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          padding: EdgeInsets.all(isSmallScreen ? 20 : 24),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(isSmallScreen ? 24 : 28)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1094,44 +1235,64 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               Container(
                 width: 40,
                 height: 4,
-                margin: const EdgeInsets.only(bottom: 24),
+                margin: EdgeInsets.only(bottom: isSmallScreen ? 20 : 24),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: colorScheme.outline.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
                 alignment: Alignment.center,
               ),
-              const Text(
+              Text(
                 "Edit Transaction",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 24),
-              TextField(
+              SizedBox(height: isSmallScreen ? 20 : 24),
+              Material(
+                elevation: 2,
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                child: TextField(
                 controller: titleController,
                 decoration: InputDecoration(
                   labelText: "Title",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.title),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12)),
+                    prefixIcon: Icon(Icons.title, color: colorScheme.primary),
+                    filled: true,
+                    fillColor: colorScheme.surface,
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              TextField(
+              SizedBox(height: isSmallScreen ? 16 : 16),
+              Material(
+                elevation: 2,
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                child: TextField(
                 controller: amountController,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: "Amount",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.attach_money),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12)),
+                    prefixIcon: Icon(Icons.attach_money, color: colorScheme.primary),
+                    filled: true,
+                    fillColor: colorScheme.surface,
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
+              SizedBox(height: isSmallScreen ? 16 : 16),
+              Material(
+                elevation: 2,
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                child: DropdownButtonFormField<String>(
                 value: category,
                 decoration: InputDecoration(
                   labelText: "Category",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.category),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12)),
+                    prefixIcon: Icon(Icons.category, color: colorScheme.primary),
+                    filled: true,
+                    fillColor: colorScheme.surface,
                 ),
                 items: ["Income", "Expense"]
                     .map((e) => DropdownMenuItem(value: e, child: Text(e)))
@@ -1140,12 +1301,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   if (value != null) category = value;
                 },
               ),
-              const SizedBox(height: 24),
-              ElevatedButton(
+              ),
+              SizedBox(height: isSmallScreen ? 20 : 24),
+              Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                color: colorScheme.primary,
+                child: ElevatedButton(
                 onPressed: () async {
                   if (titleController.text.isEmpty || amountController.text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Please fill all fields")),
+                        SnackBar(
+                          content: Text("Please fill all fields"),
+                          backgroundColor: colorScheme.error,
+                        ),
                     );
                     return;
                   }
@@ -1163,26 +1332,93 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     await TransactionService().updateTransaction(updatedTransaction, currentUser.uid);
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Transaction updated successfully")),
+                        SnackBar(
+                          content: Text("Transaction updated successfully"),
+                          backgroundColor: colorScheme.primary,
+                        ),
                     );
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Failed to update transaction: $e")));
+                          SnackBar(
+                            content: Text("Failed to update transaction: $e"),
+                            backgroundColor: colorScheme.error,
+                          ));
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade600,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 14 : 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12)),
+                  ),
+                  child: Text(
+                    "Update Transaction", 
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onPrimary,
+                    ),
+                  ),
                 ),
-                child: const Text("Update Transaction", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: isSmallScreen ? 16 : 16),
             ],
           ),
         ),
       ),
+    );
+  }
+  void _showDeleteConfirmation(BuildContext context, TransactionModel transaction) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isSmallScreen = MediaQuery.of(context).size.height < 700;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: colorScheme.surface,
+          elevation: 24,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 20),
+          ),
+          title: Text(
+            'Delete Transaction',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to delete "${transaction.title}"?',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: colorScheme.primary),
+              ),
+            ),
+            Material(
+              elevation: 2,
+              borderRadius: BorderRadius.circular(8),
+              color: colorScheme.error,
+              child: TextButton(
+                onPressed: () async {
+                  await TransactionService().deleteTransaction(transaction.id, currentUser.uid);
+                  Navigator.pop(context);
+                },
+                child: Text(
+                  'Delete',
+                  style: TextStyle(color: colorScheme.onError),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

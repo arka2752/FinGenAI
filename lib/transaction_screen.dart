@@ -34,7 +34,6 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
   void initState() {
     super.initState();
     final currentUser = FirebaseAuth.instance.currentUser!;
-    // Subscribe to real-time transactions
     _transactionSubscription = transactionService
         .getUserTransactions(currentUser.uid)
         .listen((transactions) {
@@ -51,13 +50,15 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
   }
 
   void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.minScrollExtent, // reverse:true
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   void _sendMessage(String text) async {
@@ -72,7 +73,6 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
     _scrollToBottom();
 
     try {
-      // Pass the latest transactions and session context to AI service
       final reply = await aiTransactionService.handleCommand(
         text,
         currentUser.uid,
@@ -101,78 +101,209 @@ class _TransactionChatScreenState extends State<TransactionChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.height < 600;
+    final isExtraSmallScreen = size.height < 500;
+
     return Scaffold(
-      appBar: AppBar(title: const Text("AI Transaction Chat")),
-      resizeToAvoidBottomInset: true,
+      backgroundColor: colorScheme.surface,
+      appBar: _buildMaterialAppBar(colorScheme, isSmallScreen, isExtraSmallScreen),
       body: Column(
         children: [
-          // Chat messages
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              reverse: true,
-              padding: const EdgeInsets.all(8.0),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final msg = _messages[index];
-                return Align(
-                  alignment:
-                  msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.7),
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 10, horizontal: 14),
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    decoration: BoxDecoration(
-                      color: msg.isUser ? Colors.blue : Colors.grey[300],
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(12),
-                        topRight: const Radius.circular(12),
-                        bottomLeft: Radius.circular(msg.isUser ? 12 : 0),
-                        bottomRight: Radius.circular(msg.isUser ? 0 : 12),
-                      ),
-                    ),
-                    child: Text(
-                      msg.text,
-                      style: TextStyle(
-                        color: msg.isUser ? Colors.white : Colors.black,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
+            child: _messages.isEmpty
+                ? _buildEmptyChatState(colorScheme, isSmallScreen, isExtraSmallScreen)
+                : _buildChatMessages(colorScheme, isSmallScreen, isExtraSmallScreen),
           ),
+          _buildMaterialInputBox(colorScheme, isSmallScreen, isExtraSmallScreen),
+        ],
+      ),
+    );
+  }
 
-          // Input box
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      maxLines: null,
-                      decoration: const InputDecoration(
-                        hintText: "Type a message (e.g., add 50 USD)",
-                        border: OutlineInputBorder(),
-                      ),
-                      onSubmitted: _sendMessage,
-                    ),
+  PreferredSizeWidget _buildMaterialAppBar(ColorScheme colorScheme, bool isSmallScreen, bool isExtraSmallScreen) {
+    return AppBar(
+      backgroundColor: colorScheme.surface,
+      elevation: 4,
+      shadowColor: colorScheme.shadow.withOpacity(0.3),
+      title: Text(
+        "AI Transaction Chat",
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: colorScheme.onSurface,
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.info_outline, color: colorScheme.primary),
+          onPressed: () => _showHelpDialog(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyChatState(ColorScheme colorScheme, bool isSmallScreen, bool isExtraSmallScreen) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.chat_bubble_outline, size: 50, color: colorScheme.onSurfaceVariant),
+          const SizedBox(height: 16),
+          Text(
+            "Start a conversation",
+            style: TextStyle(fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Type your first message below",
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatMessages(ColorScheme colorScheme, bool isSmallScreen, bool isExtraSmallScreen) {
+    return ListView.builder(
+      controller: _scrollController,
+      reverse: true,
+      padding: const EdgeInsets.all(12),
+      itemCount: _messages.length,
+      itemBuilder: (context, index) {
+        final msg = _messages[index];
+        return _buildMaterialMessageBubble(msg, colorScheme);
+      },
+    );
+  }
+
+  Widget _buildMaterialMessageBubble(ChatMessage msg, ColorScheme colorScheme) {
+    return Align(
+      alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.all(12),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.65),
+        decoration: BoxDecoration(
+          color: msg.isUser ? colorScheme.primary : colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: msg.isUser
+              ? [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(2, 2))]
+              : [],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  msg.isUser ? Icons.person : Icons.smart_toy,
+                  size: 16,
+                  color: msg.isUser ? colorScheme.onPrimary : colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  msg.isUser ? "You" : "AI Assistant",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: msg.isUser ? colorScheme.onPrimary : colorScheme.primary,
                   ),
-                  const SizedBox(width: 8),
-                  _isProcessing
-                      ? const CircularProgressIndicator()
-                      : IconButton(
-                    icon: const Icon(Icons.send),
-                    onPressed: () => _sendMessage(_controller.text),
-                  ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              msg.text,
+              style: TextStyle(
+                color: msg.isUser ? colorScheme.onPrimary : colorScheme.onSurface,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMaterialInputBox(ColorScheme colorScheme, bool isSmallScreen, bool isExtraSmallScreen) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                decoration: InputDecoration(
+                  hintText: "Ask about finances...",
+                  filled: true,
+                  fillColor: colorScheme.surface,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  prefixIcon: Icon(Icons.chat_bubble_outline, color: colorScheme.primary),
+                ),
+                onSubmitted: _sendMessage,
+              ),
+            ),
+            const SizedBox(width: 6),
+            _isProcessing
+                ? Padding(
+              padding: const EdgeInsets.all(8),
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(color: colorScheme.primary, strokeWidth: 2),
+              ),
+            )
+                : IconButton(
+              icon: Icon(Icons.send, color: colorScheme.primary),
+              onPressed: () => _sendMessage(_controller.text),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("AI Assistant Help", style: TextStyle(color: colorScheme.onSurface)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHelpItem("Add Transaction", "add 50 USD for lunch", Icons.add, colorScheme),
+              _buildHelpItem("View Balance", "show my balance", Icons.account_balance_wallet, colorScheme),
+              _buildHelpItem("Analyze Spending", "analyze my expenses", Icons.analytics, colorScheme),
+            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Got it!", style: TextStyle(color: colorScheme.primary)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildHelpItem(String title, String example, IconData icon, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, color: colorScheme.primary),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: TextStyle(fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
+              Text(example, style: TextStyle(color: colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic)),
+            ],
+          )
         ],
       ),
     );

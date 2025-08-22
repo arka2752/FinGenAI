@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 
 class DeepSeekService {
   // Replace with your OpenRouter API key (keep it secret!)
-  final String apiKey = "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";
+  final String apiKey = "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";
 
   // OpenRouter endpoint for chat completions
   final String baseUrl = "https://openrouter.ai/api/v1/chat/completions";

@@ -65,6 +65,8 @@ class _PieChartWidgetState extends State<PieChartWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     if (widget.data.isEmpty) {
       return Container(
         height: widget.size ?? 300,
@@ -72,7 +74,7 @@ class _PieChartWidgetState extends State<PieChartWidget> {
           child: Text(
             'No data available',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Colors.grey[600],
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -128,7 +130,7 @@ class _PieChartWidgetState extends State<PieChartWidget> {
                       style: widget.centerTextStyle ??
                           Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: Theme.of(context).primaryColor,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                       textAlign: TextAlign.center,
                     ),
@@ -139,7 +141,7 @@ class _PieChartWidgetState extends State<PieChartWidget> {
         ),
         if (widget.showLegend) ...[
           const SizedBox(height: 16),
-          _buildLegend(),
+          _buildLegend(colorScheme),
         ],
       ],
     );
@@ -176,7 +178,7 @@ class _PieChartWidgetState extends State<PieChartWidget> {
     }).toList();
   }
 
-  Widget _buildLegend() {
+  Widget _buildLegend(ColorScheme colorScheme) {
     return Wrap(
       spacing: 16,
       runSpacing: 8,
@@ -195,12 +197,12 @@ class _PieChartWidgetState extends State<PieChartWidget> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               color: touchedIndex == index
-                  ? _colors[index % _colors.length].withOpacity(0.1)
+                  ? _colors[index % _colors.length].withOpacity(0.08)
                   : Colors.transparent,
               border: Border.all(
                 color: touchedIndex == index
                     ? _colors[index % _colors.length]
-                    : Colors.transparent,
+                    : colorScheme.outline.withOpacity(0.12),
                 width: 1,
               ),
             ),
@@ -231,12 +233,13 @@ class _PieChartWidgetState extends State<PieChartWidget> {
                       entry.key,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                     Text(
                       '${entry.value.toStringAsFixed(1)} (${percentage.toStringAsFixed(1)}%)',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
