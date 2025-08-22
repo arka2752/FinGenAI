@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1045239576796",
+    "project_id": "sriti-5970a",
+    "storage_bucket": "sriti-5970a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1045239576796:android:c8a60415e53c26ba66dc19",
+        "android_client_info": {
+          "package_name": "com.example.fingenai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB42oXeBpV0PJuIiIQGLUhjUPnt0ppc928"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
